@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Call of War</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #2c3e50;
+            color: #ecf0f1;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #menuScreen, #gameScreen {
+            display: none;
+        }
+
+        #menuScreen.active, #gameScreen.active {
+            display: flex;
+        }
+
+        /* Menu */
+        #menuScreen {
+            flex-direction: column;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .title {
+            font-size: 64px;
+            font-weight: bold;
+            color: #e74c3c;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+        }
+
+        .victories {
+            font-size: 28px;
+            color: #ecf0f1;
+        }
+
+        .playButton {
+            background: #2980b9;
+            color: white;
+            border: 3px solid #3498db;
+            padding: 20px 60px;
+            font-size: 32px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .playButton:hover {
+            background: #3498db;
+            transform: scale(1.05);
+        }
+
+        /* Game Screen */
+        #gameScreen {
+            width: 100%;
+            height: 100%;
+        }
+
+        #gameCanvas {
+            border: 3px solid #34495e;
+            background: #34495e;
+        }
+
+        #uiPanel {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            width: 320px;
+            background: #2c3e50;
+            border: 3px solid #34495e;
+            padding: 20px;
+            border-radius: 8px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .uiSection {
+            margin-bottom: 20px;
+        }
+
+        .uiTitle {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #3498db;
+        }
+
+        .uiText {
+            font-size: 16px;
+            margin: 5px 0;
+        }
+
+        .playerItem {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 8px 0;
+            padding: 5px;
+            background: #34495e;
+            border-radius: 4px;
+        }
+
+        .playerColor {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid #ecf0f1;
+        }
+
+        /* Cell Menu */
+        .cellMenu {
+            position: absolute;
+            background: #2c3e50;
+            border: 3px solid #34495e;
+            border-radius: 8px;
+            padding: 10px;
+            display: none;
+            z-index: 1000;
+        }
+
+        .cellMenu.active {
+            display: block;
+        }
+
+        .menuButton {
+            background: #2980b9;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            margin: 5px 0;
+            width: 100%;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .menuButton:hover {
+            background: #3498db;
+        }
+
+        .menuButton.attack {
+            background: #c0392b;
+        }
+
+        .menuButton.attack:hover {
+            background: #e74c3c;
+        }
+
+        .menuButton:disabled {
+            background: #7f8c8d;
+            cursor: not-allowed;
+        }
+
+        #gameOver {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 30px;
+            z-index: 2000;
+        }
+
+        #gameOver.active {
+            display: flex;
+        }
+
+        .gameOverText {
+            font-size: 48px;
+            font-weight: bold;
+        }
+
+        .victory {
+            color: #2ecc71;
+        }
+
+        .defeat {
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- Menu Screen -->
+        <div id="menuScreen" class="active">
+            <div class="title">CALL OF WAR</div>
+            <div class="victories">Victoires: <span id="victoriesCount">0</span></div>
+            <button class="playButton" onclick="startGame()">JOUER</button>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="gameScreen">
+            <canvas id="gameCanvas"></canvas>
+            
+            <div id="uiPanel">
+                <div class="uiSection">
+                    <div class="uiTitle">📊 Vos Statistiques</div>
+                    <div class="uiText">💰 Argent: <span id="playerMoney">10000</span>K</div>
+                    <div class="uiText">⚔️ Troupes max: <span id="playerMaxTroops">100</span></div>
+                    <div class="uiText">🗺️ Territoires: <span id="playerTerritories">0</span></div>
+                </div>
+                
+                <div class="uiSection">
+                    <div class="uiTitle">👥 Joueurs en vie</div>
+                    <div id="playersList"></div>
+                </div>
+            </div>
+
+            <div id="cellMenu" class="cellMenu"></div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameOver">
+            <div class="gameOverText" id="gameOverText"></div>
+            <button class="playButton" onclick="backToMenu()">RETOUR AU MENU</button>
+        </div>
+    </div>
+
+    <script>
+        const MAP_SIZE = 25;
+        const CELL_SIZE = 25;
+        let canvas, ctx;
+        let victories = 0;
+        let gameState = 'menu';
+        let mapGrid = [];
+        let players = [];
+        let humanPlayerId = 0;
+        let selectedCell = null;
+        let ports = [];
+        let tradeRoutes = [];
+
+        const TerrainType = {
+            WATER: 0,
+            LAND: 1
+        };
+
+        const BuildingType = {
+            NONE: 0,
+            CITY: 1,
+            MISSILE_SILO: 2,
+            PORT: 3
+        };
+
+        class Cell {
+            constructor(terrain) {
+                this.terrain = terrain;
+                this.owner = null;
+                this.troops = 0;
+                this.building = BuildingType.NONE;
+            }
+        }
+
+        class Player {
+            constructor(id, name, color, isBot = true) {
+                this.id = id;
+                this.name = name;
+                this.color = color;
+                this.money = 10000;
+                this.isBot = isBot;
+                this.isAlive = true;
+                this.maxTroops = 100;
+                this.allies = [];
+            }
+        }
+
+        function initCanvas() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            canvas.width = MAP_SIZE * CELL_SIZE + 100;
+            canvas.height = MAP_SIZE * CELL_SIZE + 100;
+            
+            canvas.addEventListener('click', handleCanvasClick);
+        }
+
+        function generateTerrain() {
+            mapGrid = [];
+            for (let y = 0; y < MAP_SIZE; y++) {
+                mapGrid[y] = [];
+                for (let x = 0; x < MAP_SIZE; x++) {
+                    mapGrid[y][x] = new Cell(TerrainType.WATER);
+                }
+            }
+
+            const numLandmasses = Math.floor(Math.random() * 4) + 3;
+            const seedPoints = [];
+            
+            for (let i = 0; i < numLandmasses; i++) {
+                seedPoints.push({
+                    x: Math.floor(Math.random() * MAP_SIZE),
+                    y: Math.floor(Math.random() * MAP_SIZE)
+                });
+            }
+
+            for (let y = 0; y < MAP_SIZE; y++) {
+                for (let x = 0; x < MAP_SIZE; x++) {
+                    let minDist = Infinity;
+                    for (let seed of seedPoints) {
+                        const dist = Math.sqrt((x - seed.x) ** 2 + (y - seed.y) ** 2);
+                        minDist = Math.min(minDist, dist);
+                    }
+
+                    if (minDist < 4 + Math.random() * 3) {
+                        mapGrid[y][x].terrain = TerrainType.LAND;
+                    } else if (minDist < 6 + Math.random() * 2) {
+                        if (Math.random() > 0.5) {
+                            mapGrid[y][x].terrain = TerrainType.LAND;
+                        }
+                    }
+                }
+            }
+        }
+
+        function startGame() {
+            document.getElementById('menuScreen').classList.remove('active');
+            document.getElementById('gameScreen').classList.add('active');
+            
+            initCanvas();
+            generateTerrain();
+            initPlayers();
+            gameState = 'playing';
+            gameLoop();
+        }
+
+        function initPlayers() {
+            players = [];
+            const numBots = Math.floor(Math.random() * 11) + 10;
+            
+            players.push(new Player(0, "Vous", "#e74c3c", false));
+            humanPlayerId = 0;
+
+            const botColors = [
+                "#3498db", "#2ecc71", "#9b59b6", "#f1c40f",
+                "#e67e22", "#95a5a6", "#1abc9c", "#8e44ad",
+                "#c0392b", "#27ae60", "#2980b9", "#f39c12",
+                "#d35400", "#7f8c8d", "#16a085", "#7d3c98"
+            ];
+
+            for (let i = 0; i < numBots; i++) {
+                const color = botColors[i % botColors.length];
+                players.push(new Player(i + 1, `Bot ${i + 1}`, color, true));
+            }
+
+            const landCells = [];
+            for (let y = 0; y < MAP_SIZE; y++) {
+                for (let x = 0; x < MAP_SIZE; x++) {
+                    if (mapGrid[y][x].terrain === TerrainType.LAND) {
+                        landCells.push({x, y});
+                    }
+                }
+            }
+
+            shuffleArray(landCells);
+
+            for (let i = 0; i < players.length && i < landCells.length; i++) {
+                const {x, y} = landCells[i];
+                mapGrid[y][x].owner = players[i].id;
+                mapGrid[y][x].troops = 5;
+            }
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function drawMap() {
+            const offsetX = 50;
+            const offsetY = 50;
+
+            for (let y = 0; y < MAP_SIZE; y++) {
+                for (let x = 0; x < MAP_SIZE; x++) {
+                    const cell = mapGrid[y][x];
+                    const px = offsetX + x * CELL_SIZE;
+                    const py = offsetY + y * CELL_SIZE;
+
+                    if (cell.terrain === TerrainType.WATER) {
+                        ctx.fillStyle = "#3498db";
+                    } else {
+                        if (cell.owner !== null) {
+                            ctx.fillStyle = players[cell.owner].color;
+                        } else {
+                            ctx.fillStyle = "#ecf0f1";
+                        }
+                    }
+
+                    ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+                    ctx.strokeStyle = "#bdc3c7";
+                    ctx.strokeRect(px, py, CELL_SIZE, CELL_SIZE);
+
+                    // Dessiner les bâtiments
+                    if (cell.building !== BuildingType.NONE) {
+                        const centerX = px + CELL_SIZE / 2;
+                        const centerY = py + CELL_SIZE / 2;
+
+                        if (cell.building === BuildingType.CITY) {
+                            ctx.fillStyle = "white";
+                            ctx.beginPath();
+                            ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+                            ctx.fill();
+                        } else if (cell.building === BuildingType.MISSILE_SILO) {
+                            ctx.fillStyle = "red";
+                            ctx.beginPath();
+                            ctx.moveTo(centerX, centerY - 5);
+                            ctx.lineTo(centerX - 4, centerY + 5);
+                            ctx.lineTo(centerX + 4, centerY + 5);
+                            ctx.closePath();
+                            ctx.fill();
+                        } else if (cell.building === BuildingType.PORT) {
+                            ctx.fillStyle = "#8B4513";
+                            ctx.fillRect(centerX - 4, centerY - 4, 8, 8);
+                        }
+                    }
+                }
+            }
+        }
+
+        function updateUI() {
+            const player = players[humanPlayerId];
+            
+            document.getElementById('playerMoney').textContent = player.money;
+            document.getElementById('playerMaxTroops').textContent = player.maxTroops;
+            
+            let territories = 0;
+            for (let row of mapGrid) {
+                for (let cell of row) {
+                    if (cell.owner === humanPlayerId) territories++;
+                }
+            }
+            document.getElementById('playerTerritories').textContent = territories;
+
+            const playersList = document.getElementById('playersList');
+            playersList.innerHTML = '';
+            
+            for (let p of players) {
+                if (!p.isAlive) continue;
+                
+                let terr = 0;
+                for (let row of mapGrid) {
+                    for (let cell of row) {
+                        if (cell.owner === p.id) terr++;
+                    }
+                }
+
+                const item = document.createElement('div');
+                item.className = 'playerItem';
+                item.innerHTML = `
+                    <div class="playerColor" style="background: ${p.color}"></div>
+                    <div>${p.name}: ${terr}</div>
+                `;
+                playersList.appendChild(item);
+            }
+        }
+
+        function handleCanvasClick(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const offsetX = 50;
+            const offsetY = 50;
+
+            const gridX = Math.floor((x - offsetX) / CELL_SIZE);
+            const gridY = Math.floor((y - offsetY) / CELL_SIZE);
+
+            if (gridX >= 0 && gridX < MAP_SIZE && gridY >= 0 && gridY < MAP_SIZE) {
+                const cell = mapGrid[gridY][gridX];
+                if (cell.terrain === TerrainType.LAND) {
+                    showCellMenu(gridX, gridY, e.clientX, e.clientY);
+                }
+            } else {
+                hideCellMenu();
+            }
+        }
+
+        function showCellMenu(x, y, screenX, screenY) {
+            selectedCell = {x, y};
+            const cell = mapGrid[y][x];
+            const menu = document.getElementById('cellMenu');
+            menu.innerHTML = '';
+
+            if (cell.owner === humanPlayerId) {
+                if (cell.building === BuildingType.NONE) {
+                    const cityBtn = createMenuButton('🏙️ Ville (500K)', () => buildCity(x, y));
+                    const siloBtn = createMenuButton('🚀 Silo missiles (300K)', () => buildSilo(x, y));
+                    menu.appendChild(cityBtn);
+                    menu.appendChild(siloBtn);
+
+                    if (isAdjacentToWater(x, y)) {
+                        const portBtn = createMenuButton('⚓ Port (400K)', () => buildPort(x, y));
+                        menu.appendChild(portBtn);
+                    }
+                }
+            } else if (cell.owner !== null) {
+                const attackBtn = createMenuButton('⚔️ Attaquer', () => attackTerritory(x, y), 'attack');
+                menu.appendChild(attackBtn);
+            }
+
+            menu.style.left = screenX + 'px';
+            menu.style.top = screenY + 'px';
+            menu.classList.add('active');
+
+            setTimeout(() => {
+                document.addEventListener('click', hideCellMenuOnce);
+            }, 100);
+        }
+
+        function hideCellMenu() {
+            document.getElementById('cellMenu').classList.remove('active');
+        }
+
+        function hideCellMenuOnce(e) {
+            if (!e.target.closest('.cellMenu')) {
+                hideCellMenu();
+                document.removeEventListener('click', hideCellMenuOnce);
+            }
+        }
+
+        function createMenuButton(text, onClick, className = '') {
+            const btn = document.createElement('button');
+            btn.className = 'menuButton ' + className;
+            btn.textContent = text;
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                onClick();
+                hideCellMenu();
+            };
+            return btn;
+        }
+
+        function buildCity(x, y) {
+            const player = players[humanPlayerId];
+            if (player.money >= 500) {
+                mapGrid[y][x].building = BuildingType.CITY;
+                player.money -= 500;
+                player.maxTroops += 100;
+            }
+        }
+
+        function buildSilo(x, y) {
+            const player = players[humanPlayerId];
+            if (player.money >= 300) {
+                mapGrid[y][x].building = BuildingType.MISSILE_SILO;
+                player.money -= 300;
+            }
+        }
+
+        function buildPort(x, y) {
+            const player = players[humanPlayerId];
+            if (player.money >= 400) {
+                mapGrid[y][x].building = BuildingType.PORT;
+                player.money -= 400;
+                ports.push({playerId: humanPlayerId, x, y});
+            }
+        }
+
+        function isAdjacentToWater(x, y) {
+            const dirs = [[-1,0], [1,0], [0,-1], [0,1]];
+            for (let [dx, dy] of dirs) {
+                const nx = x + dx;
+                const ny = y + dy;
+                if (nx >= 0 && nx < MAP_SIZE && ny >= 0 && ny < MAP_SIZE) {
+                    if (mapGrid[ny][nx].terrain === TerrainType.WATER) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function attackTerritory(x, y) {
+            // Trouver un territoire adjacent du joueur
+            const dirs = [[-1,0], [1,0], [0,-1], [0,1]];
+            for (let [dx, dy] of dirs) {
+                const ax = x + dx;
+                const ay = y + dy;
+                if (ax >= 0 && ax < MAP_SIZE && ay >= 0 && ay < MAP_SIZE) {
+                    const attackerCell = mapGrid[ay][ax];
+                    if (attackerCell.owner === humanPlayerId && attackerCell.troops > 1) {
+                        const defenderCell = mapGrid[y][x];
+                        
+                        if (attackerCell.troops > defenderCell.troops) {
+                            defenderCell.owner = humanPlayerId;
+                            defenderCell.troops = Math.floor((attackerCell.troops - defenderCell.troops) / 2);
+                            attackerCell.troops = 1;
+                        } else {
+                            defenderCell.troops -= Math.floor(attackerCell.troops / 2);
+                            attackerCell.troops = 1;
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        function updateGame() {
+            // Régénération de troupes
+            for (let row of mapGrid) {
+                for (let cell of row) {
+                    if (cell.owner !== null && cell.terrain === TerrainType.LAND) {
+                        if (cell.troops < 10) {
+                            cell.troops = Math.min(10, cell.troops + 0.01);
+                        }
+                    }
+                }
+            }
+
+            // Actions des bots (simplifiées)
+            if (Math.random() < 0.02) {
+                botActions();
+            }
+
+            // Vérifier victoire/défaite
+            checkGameOver();
+        }
+
+        function botActions() {
+            for (let player of players) {
+                if (!player.isBot || !player.isAlive) continue;
+                
+                // Attaque aléatoire
+                if (Math.random() < 0.3) {
+                    const territories = [];
+                    for (let y = 0; y < MAP_SIZE; y++) {
+                        for (let x = 0; x < MAP_SIZE; x++) {
+                            if (mapGrid[y][x].owner === player.id && mapGrid[y][x].troops > 3) {
+                                territories.push({x, y});
+                            }
+                        }
+                    }
+
+                    if (territories.length > 0) {
+                        const from = territories[Math.floor(Math.random() * territories.length)];
+                        const dirs = [[-1,0], [1,0], [0,-1], [0,1]];
+                        const dir = dirs[Math.floor(Math.random() * dirs.length)];
+                        const tx = from.x + dir[0];
+                        const ty = from.y + dir[1];
+
+                        if (tx >= 0 && tx < MAP_SIZE && ty >= 0 && ty < MAP_SIZE) {
+                            const target = mapGrid[ty][tx];
+                            if (target.owner !== player.id && target.terrain === TerrainType.LAND) {
+                                const attacker = mapGrid[from.y][from.x];
+                                if (attacker.troops > target.troops) {
+                                    target.owner = player.id;
+                                    target.troops = Math.floor((attacker.troops - target.troops) / 2);
+                                    attacker.troops = 1;
+                                } else {
+                                    target.troops -= Math.floor(attacker.troops / 2);
+                                    attacker.troops = 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function checkGameOver() {
+            for (let player of players) {
+                let territories = 0;
+                for (let row of mapGrid) {
+                    for (let cell of row) {
+                        if (cell.owner === player.id) territories++;
+                    }
+                }
+                if (territories === 0 && player.isAlive) {
+                    player.isAlive = false;
+                }
+            }
+
+            const alivePlayers = players.filter(p => p.isAlive);
+            if (alivePlayers.length === 1) {
+                endGame(alivePlayers[0].id === humanPlayerId);
+            }
+        }
+
+        function endGame(isVictory) {
+            gameState = 'gameover';
+            const gameOverDiv = document.getElementById('gameOver');
+            const gameOverText = document.getElementById('gameOverText');
+            
+            if (isVictory) {
+                victories++;
+                gameOverText.textContent = '🎉 VICTOIRE ! 🎉';
+                gameOverText.className = 'gameOverText victory';
+            } else {
+                gameOverText.textContent = '💀 DÉFAITE 💀';
+                gameOverText.className = 'gameOverText defeat';
+            }
+            
+            gameOverDiv.classList.add('active');
+        }
+
+        function backToMenu() {
+            document.getElementById('gameOver').classList.remove('active');
+            document.getElementById('gameScreen').classList.remove('active');
+            document.getElementById('menuScreen').classList.add('active');
+            document.getElementById('victoriesCount').textContent = victories;
+            gameState = 'menu';
+        }
+
+        function gameLoop() {
+            if (gameState !== 'playing') return;
+
+            ctx.fillStyle = "#2c3e50";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawMap();
+            updateUI();
+            updateGame();
+
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
